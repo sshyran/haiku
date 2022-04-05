@@ -172,11 +172,19 @@ def transparent_lift(
 ) -> Callable[..., hk.Params]:
   """Similar to `lift` except no additional scope is added to the parameters."""
 
-  base.assert_context("lift")
+  base.assert_context("transparent_lift")
   init_fn = add_state_to_init_fn(init_fn)
   lifted = LiftingModule(init_fn, transparent=True)
-  # NOTE: Using lambda to avoid exposing module object.
-  return lambda *a, **k: lifted(*a, **k)[0]  # pylint: disable=unnecessary-lambda
+  def fn(*a, **k):
+    tmp = base.ENFORCE_NO_CLOSURE
+    base.ENFORCE_NO_CLOSURE = "transparent_lift"
+    try:
+      out = lifted(*a, **k)[0]
+    finally:
+      base.ENFORCE_NO_CLOSURE = tmp
+    return out
+
+  return fn
 
 
 def with_assert_not_used(f):

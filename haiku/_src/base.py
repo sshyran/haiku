@@ -37,6 +37,7 @@ from jax import core as jax_core
 import jax.numpy as jnp
 
 DEFAULT_PRNG_RESERVE_SIZE = 1
+ENFORCE_NO_CLOSURE = ""
 
 Stack = data_structures.Stack
 ThreadLocalStack = data_structures.ThreadLocalStack
@@ -258,6 +259,10 @@ def safe_get_module_name(module: Module) -> str:
   if not hasattr(module, "module_name"):
     raise ValueError("The super constructor must be called before you create "
                      "parameters or submodules.")
+  if ENFORCE_NO_CLOSURE and current_frame() != module.creation_frame:
+    raise ValueError("You can't functionally close over a module which has "
+                     "been intitialized outside of the function wrapped in "
+                     "{ENFORCE_NO_CLOSURE}.")
   return module.module_name
 
 
