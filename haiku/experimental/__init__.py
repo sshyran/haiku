@@ -29,6 +29,7 @@ from haiku._src.layer_stack import layer_stack
 from haiku._src.lift import lift
 from haiku._src.lift import lift_with_state
 from haiku._src.lift import LiftWithStateUpdater
+from haiku._src.module import force_name
 from haiku._src.module import intercept_methods
 from haiku._src.module import MethodContext
 from haiku._src.module import name_like
@@ -53,6 +54,7 @@ __all__ = (
     "check_jax_usage",
     "custom_creator",
     "custom_getter",
+    "force_name",
     "intercept_methods",
     "jaxpr_info",
     "layer_stack",

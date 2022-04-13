@@ -18,7 +18,7 @@ import abc
 import contextlib
 import dataclasses
 import sys
-from typing import Callable, Optional, Sequence
+from typing import Callable, Optional, Sequence, TypeVar, Type
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -36,6 +36,8 @@ if sys.version_info < (3, 8):
 else:
   from typing import Protocol, runtime_checkable
 # pylint: enable=g-import-not-at-top,g-multiple-import
+
+T = TypeVar("T")
 
 
 # TODO(tomhennigan) Improve test coverage.
@@ -606,6 +608,54 @@ class ModuleTest(parameterized.TestCase):
     self.assertRegex(str(NoAutoReprModule()),
                      "<.*.NoAutoReprModule object at .*>")
 
+  @parameterized.parameters("foo", "foo/bar")
+  @test_utils.transform_and_run
+  def test_force_name_naming(self, name):
+    m0 = create_module_from_qualified_name(name)
+    m1 = module.Module(name=module.force_name(name))
+    m2 = module.Module(name=module.force_name(name))
+    self.assertEqual(m0.name, m1.name)
+    self.assertEqual(m0.module_name, m1.module_name)
+    self.assertEqual(m1.name, m2.name)
+    self.assertEqual(m1.module_name, m2.module_name)
+
+  @test_utils.transform_and_run
+  def test_force_name_reserves_name(self):
+    m0 = module.Module(name=module.force_name("foo"))
+    m1 = module.Module(name="foo")
+    self.assertEqual(m0.module_name, "foo")
+    self.assertEqual(m1.module_name, "foo_1")
+
+  @parameterized.parameters("foo", "foo/bar")
+  @test_utils.transform_and_run
+  def test_force_name_inside_module(self, name):
+    class CreatesInnerModule(module.Module):
+
+      def __call__(self):
+        return module.Module(name=module.force_name(name))
+
+    m0 = create_module_from_qualified_name(name)
+    m1 = CreatesInnerModule()()
+    m2 = module.Module(name=module.force_name(name))
+    self.assertEqual(m0.module_name, m1.module_name)
+    self.assertEqual(m1.module_name, m2.module_name)
+
+  @test_utils.transform_and_run
+  def test_force_name_inside_name_scope(self):
+    m0 = module.Module(name="foo")
+    with module.name_scope("bar"):
+      m1 = module.Module(name=module.force_name("foo"))
+    m2 = module.Module(name=module.force_name("foo"))
+    self.assertEqual(m0.module_name, m1.module_name)
+    self.assertEqual(m1.module_name, m2.module_name)
+
+  @parameterized.parameters("foo", "foo/bar")
+  @test_utils.transform_and_run
+  def test_force_name_parameter_reuse(self, name):
+    m0 = create_module_from_qualified_name(name=name, cls=ScalarModule)
+    m1 = ScalarModule(name=module.force_name(name))
+    self.assertIs(m0(), m1())
+
 
 class NoAutoReprModule(module.Module):
   AUTO_REPR = False
@@ -838,6 +888,19 @@ class ModuleWithDoubleCall(module.Module):
   def __call__(self):
     self.foo()
     self.call_module = module.Module(name="child")
+
+
+def create_module_from_qualified_name(
+    name: str,
+    *,
+    cls: Type[T] = module.Module,
+) -> T:
+  if "/" in name:
+    prefix, suffix = name.rsplit("/", 1)
+    with module.name_scope(prefix):
+      return cls(name=suffix)
+  else:
+    return cls(name=name)
 
 if __name__ == "__main__":
   absltest.main()
